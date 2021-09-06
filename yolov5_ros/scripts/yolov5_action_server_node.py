@@ -38,9 +38,13 @@ class YoloAction():
 
 		self.bridge = CvBridge()
 		# TODO: take this from param server
-		self.yolo_path = "/home/user/ws/src/yolov5_ros/yolov5/scripts/yolov5_detect.py"
+		#self.yolo_path = "/home/user/ws/src/yolov5_ros/yolov5/scripts/yolov5_detect.py"
+		self.yolo_path = os.path.join(rospy.get_param("yolo/local/yolo_path"), rospy.get_param("yolo/model/exec")
 		# TODO: take this from param server
-		self.image_path = "/home/user/ws/src/yolov5_ros/yolov5/images/det.jpg"
+		#self.image_path = "/home/user/ws/src/yolov5_ros/yolov5/images/det.jpg"
+		#self.weight_path = '/home/user/ws/src/yolov5_ros/yolov5/weights'
+		self.image_path = os.path.join(rospy.get_param("yolo/local/image_path"), rospy.get_param("yolo/local/image")
+		self.weight_path = os.path.join(rospy.get_param("yolo/local/weight_path"), rospy.get_param("yolo/model/weight")
 
 		self.as_ = actionlib.SimpleActionServer(self.action_name, CheckForObjectsAction, execute_cb=self.detectCB, auto_start = False)
 		
@@ -117,9 +121,11 @@ class YoloAction():
 if __name__ == '__main__':
 	rospy.init_node('yolov5_as')
 	# TODO: take these values from param server
-	action_name = rospy.get_name()+'/check_for_objects'
-	model_name = "ultralytics/yolov5"
+	action_name = rospy.get_param("yolo/actions/yolo/topic")
+	#model_name = "ultralytics/yolov5"
+	model_name = rospy.get_param('yolo/model/name', 'ultralytics/yolov5')
 	# weight_name = "yolov5s_sciroc.pt"
-	weight_name = "best.pt"
+	#weight_name = "best.pt"
+	weight_name = rospy.get_param('yolo/model/weight', 'best.pt')
 	as_ = YoloAction(action_name, model_name, weight_name)
 	rospy.spin()
