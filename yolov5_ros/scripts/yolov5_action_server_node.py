@@ -65,6 +65,7 @@ class YoloAction():
 		
 		try:
 			self.image = self.bridge.imgmsg_to_cv2(goal.image, 'bgr8')
+			width, height, _ = self.image.shape
 		except CvBridgeError as e:
 			rospy.logerr("%s: image conversion to cv2 failed" % e)
 
@@ -95,15 +96,15 @@ class YoloAction():
 		while ready_stdout:
 			line = self.yolo.stdout.readline().split()
 			bb = BoundingBox()
-			bb.id, bb.xmin, bb.xmax, bb.ymin, bb.ymax, bb.probability, _, bb.Class = line
+			bb.id, bb.xmin, bb.ymin, bb.xmax, bb.ymax, bb.probability = [float(x) for x in line[:-2]]
+			bb.Class = line[-1]
+			
 			bbs.bounding_boxes.append(bb)
 			ready_stdout, _, _ = select.select(readlist, [], [], 0)
 
 		result = CheckForObjectsResult()
 		result.id = goal.id
 		result.bounding_boxes = bbs
-		print(result)
-		# fill result
 		self.as_.set_succeeded(result, text="Detection complete")
 
 
