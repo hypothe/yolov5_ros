@@ -11,16 +11,16 @@ import torch
 import cv2
 
 class YoloDetector(object):
-	def __init__(self, yolo_name, weight_name):
-		self.image_path = "/home/user/ws/src/yolov5_ros/yolov5/images/det.jpg"
+	def __init__(self, yolo_name, weight_name, image_path):
+		self.image_path = image_path
 		weight_path = os.path.join('/home/user/ws/src/yolov5_ros/yolov5/weights', weight_name)
 
 		# if not os.path.isfile(weight_path):
 		# 	print("No model definition found for %s", weight_path)
 		# print(yolo_name)
 		try:
-			self.model = torch.hub.load('ultralytics/yolov5', 'yolov5s', force_reload=False)
-			#self.model = torch.hub.load('ultralytics/yolov5', 'custom', path = weight_path)  # local repo
+			#self.model = torch.hub.load('ultralytics/yolov5', 'yolov5s', force_reload=False)
+			self.model = torch.hub.load('ultralytics/yolov5', 'custom', path = weight_path)  # local repo
 			print("Model loaded")
 			sys.stdout.flush()
 		except Exception as e:
@@ -50,4 +50,4 @@ class YoloDetector(object):
 if __name__ == '__main__':
 	ppid = os.getppid()
 	yolo_name = 'ultralytics/yolov5'
-	yolo = YoloDetector(yolo_name, sys.argv[1])
+	yolo = YoloDetector(yolo_name, sys.argv[1], sys.argv[2])
