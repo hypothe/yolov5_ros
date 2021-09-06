@@ -16,14 +16,16 @@ from darknet_ros_msgs.msg import (
 import signal
 import os
 import sys
+import select
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 
 if os.name == 'posix' and sys.version_info[0] < 3:
-	print("subprocess32")
 	import subprocess32 as subprocess
 else:
 	import subprocess
+
+os.environ["PYTHONUNBUFFERED"] = "1"
 
 class YoloAction():
 
@@ -41,20 +43,24 @@ class YoloAction():
 		self.image_path = "../../yolov5/images/det.jpg"
 
 		self.as_ = actionlib.SimpleActionServer(self.action_name, CheckForObjectsAction, execute_cb=self.detectCB, auto_start = False)
-		#self.as_.register_goal_callback(self.detectCB)
-		# self.as_.register_preempt_callback(self.preemptCB)
 		
-		self.yolo = subprocess.Popen(["python3", self.yolo_path, self.weight_name, str(os.getpid())])
-		#self.yolo = subprocess.Popen(["python3", self.yolo_path, self.weight_name, str(os.getpid())], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+
+		self.yolo = subprocess.Popen(["python3", self.yolo_path, self.weight_name], bufsize=0, stdout=subprocess.PIPE)
 		#out, _ = self.yolo.communicate()
-		#rospy.loginfo("Subprocess started ", out)
-		rospy.loginfo("Subprocess call")
+		out = self.yolo.stdout.readline()
+		rospy.loginfo("Subprocess started %s" % out)
+		# rospy.loginfo("Subprocess call")
 		# the subprocess informs this one once the results are ready
 		signal.signal(signal.SIGUSR2, self.detectedImage)
+		# signal.siginterrupt(signal.SIGUSR2, False)
+
 
 		self.as_.start()
 
 		# launch the python3 script
+	def __del__(self):
+		self.yolo.kill()
+
 		
 
 	def detectCB(self, goal):
@@ -73,35 +79,63 @@ class YoloAction():
 
 		# Save the image and inform the subprocess that it's ready
 		cv2.imwrite(self.image_path, self.image)
+
+		self.got_detection = False
+		self.detection = ''
+		print("Sending and waiting for detection")
 		self.yolo.send_signal(signal.SIGUSR1)
 
-		r = rospy.Rate(1)
-
-		self.detection = ''
-		success = True
-
-		while not rospy.is_shutdown() :
-			if self._as.is_preempt_requested():
+		# the check on self.got_detection is needed to know the the program un-paused due to the correct signal
+		#while not rospy.is_shutdown() and not self.got_detection:
+		#	if self.as_.is_preempt_requested():
+		#		rospy.loginfo('%s: Preempted' % self.action_name)
+		#		self.as_.set_preempted()
+		#		success = False
+		#		break
+		#	else:
+		#		print("Waiting for detection")
+		#		signal.pause()
+		#		print(self.got_detection)
+		#	r.sleep()
+		#print("out of the loooop")
+		r = rospy.Rate(100)
+		while not self.got_detection:
+			if self.as_.is_preempt_requested():
 				rospy.loginfo('%s: Preempted' % self.action_name)
 				self.as_.set_preempted()
 				success = False
-				break
-			else:
-				signal.sigtimedwait(signal.SIGUSR2, timeout=1)
-				print("Waiting for detection")
+				return
+			
 			r.sleep()
 
-		if success:
-			# TODO: parse detection and insert it into the result
-			result = CheckForObjectsAction()
-			print(result)
-			# fill result
-			self.as_.set_succeeded(result, text="Detection complete")
+		# Not preempted, signal received
+		print("'bout to start %s %s" % (type(self.yolo.stdout), self.yolo.stdout.fileno()))
+		ready_stdout = [self.yolo.stdout.fileno()] # so it's not empty initially, not used elsewhere
+		readlist = [self.yolo.stdout.fileno()]
+		
+		_ = self.detection + self.yolo.stdout.readline()
+		bbs = BoundingBoxes()
+		while ready_stdout:
+			# self.detection = self.detection + self.yolo.stdout.readline()
+			line = self.yolo.stdout.readline().split()
+			bb = BoundingBox()
+			print(line[1:-3])
+			bb.id, bb.xmin, bb.xmax, bb.ymin, bb.ymax, bb.probability, _, bb.Class = line
+			print(bb)
+			print(line)
+			ready_stdout, _, _ = select.select(readlist, [], [], 0)
+
+		rospy.loginfo("Received detection: \n%s" % self.detection)
+		# TODO: parse detection and insert it into the result
+		result = CheckForObjectsAction()
+		#print(result)
+		# fill result
+		self.as_.set_succeeded(result, text="Detection complete")
 
 
 	def detectedImage(self, signum, frame):
-		self.detection, _ = self.yolo.communicate()
-		rospy.loginfo("Received detection: \n%s" % detection)
+		print("Yolov5 returned")
+		self.got_detection = True
 
 
 
