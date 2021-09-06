@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<launch>
+	<arg name="output" default="screen"/>
+	<arg name="node_args" default=""/>
+	<!-- load the necessary param servere from here -->
+	<rosparam command="load"  file="$(find yolov5_ros)/config/yolov5_ros.yaml"/>
+
+	<node pkg="yolov5_ros"  type="yolov5_action_server_node.py"	name="yolov5_as" output="$(arg output)"  required="true" respawn="false" args="$(arg node_args)"/>
+
+</launch>

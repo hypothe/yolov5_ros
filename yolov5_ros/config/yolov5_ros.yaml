@@ -1,0 +1,15 @@
+yolo:
+  actions:
+    yolo:
+      topic: yolov5_as/check_for_objects
+
+  model:
+    name: ultralytics/yolov5
+    weight: best.pt
+    exec: yolov5_detect.py
+
+  local:
+    yolo_path: /home/user/ws/src/sciroc2021_objdet_meta/yolov5_ros/yolov5/scripts
+    weight_path: /home/user/ws/src/sciroc2021_objdet_meta/yolov5_ros/yolov5/weights
+    image_path: /home/user/ws/src/sciroc2021_objdet_meta/yolov5_ros/yolov5/images
+    image: det.jpg
