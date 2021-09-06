@@ -36,7 +36,7 @@ class YoloAction(objdect):
 		self.as_.register_goal_callback(self.detectCB)
 		# self.as_.register_preempt_callback(self.preemptCB)
 		
-		self.yolo = subprocess.run(["python3", self.yolo_path, os.getpid()], check=True, input=PIPE, output=PIPE)
+		self.yolo = subprocess.run(["python3", self.yolo_path, self.weight_name, os.getpid()], check=True, input=PIPE, output=PIPE)
 		out, _ = self.yolo.communicate()
 		rospy.loginfo("Subprocess started ", out)
 		# the subprocess informs this one once the results are ready
@@ -81,7 +81,8 @@ if __name__ == '__main__':
 	rospy.init('yolov5_as')
 	# TODO: take these values from param server
 	action_name = rospy.get_name()+'/check_for_objects'
-	model_name = "yolov5s_sciroc.yaml"
-	weight_name = "yolov5s_sciroc.pt"
+	model_name = "ultralytics/yolov5"
+	# weight_name = "yolov5s_sciroc.pt"
+	weight_name = best.pt
 	as_ = YoloAction(actoin_name, model_name, weight_name)
 	rospy.spin()
