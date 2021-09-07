@@ -4,6 +4,7 @@
 # pip install subprocess32
 
 import rospy
+import rospkg
 
 import actionlib
 
@@ -37,32 +38,36 @@ class YoloAction():
 		self.weight_name = weight_name
 
 		self.bridge = CvBridge()
-		# TODO: take this from param server
-		#self.yolo_path = "/home/user/ws/src/yolov5_ros/yolov5/scripts/yolov5_detect.py"
-		self.yolo_path = os.path.join(rospy.get_param("yolo/local/yolo_path"), rospy.get_param("yolo/model/exec")
-		# TODO: take this from param server
-		#self.image_path = "/home/user/ws/src/yolov5_ros/yolov5/images/det.jpg"
-		#self.weight_path = '/home/user/ws/src/yolov5_ros/yolov5/weights'
-		self.image_path = os.path.join(rospy.get_param("yolo/local/image_path"), rospy.get_param("yolo/local/image")
-		self.weight_path = os.path.join(rospy.get_param("yolo/local/weight_path"), rospy.get_param("yolo/model/weight")
+		rospack = rospkg.RosPack()
+		yolov5_path = os.path.dirname(rospack.get_path('yolov5_ros'))
+		print(yolov5_path)
 
-		self.as_ = actionlib.SimpleActionServer(self.action_name, CheckForObjectsAction, execute_cb=self.detectCB, auto_start = False)
+		# cwd = os.path.dirname(os.path.realpath(__file__))
+
+		pt1, pt2 = rospy.get_param("yolo/local/yolo_path"), rospy.get_param("yolo/model/exec")
+		self.yolo_path = os.path.normpath(os.path.join(yolov5_path, pt1, pt2))
+		print(self.yolo_path)
+
+		im1, im2 = rospy.get_param("yolo/local/image_path"), rospy.get_param("yolo/local/image")
+		self.image_path = os.path.normpath(os.path.join(yolov5_path, im1, im2))
+		print(self.image_path)
+
+		wg1, wg2 = rospy.get_param("yolo/local/weight_path"), rospy.get_param("yolo/model/weight")
+		self.weight_path = os.path.normpath(os.path.join(yolov5_path, wg1, wg2))
+		print(self.weight_path)
 		
+		self.as_ = actionlib.SimpleActionServer(self.action_name, CheckForObjectsAction, execute_cb=self.detectCB, auto_start = False)
 
-		self.yolo = subprocess.Popen(["python3", self.yolo_path, self.weight_name, self.image_path], bufsize=0, stdout=subprocess.PIPE)
+		self.yolo = subprocess.Popen(["python3", self.yolo_path, self.model_name, self.image_path, self.weight_path], bufsize=0, stdout=subprocess.PIPE)
 		out = self.yolo.stdout.readline()
 		rospy.loginfo("Subprocess started %s" % out)
 		# the subprocess informs this one once the results are ready
 		signal.signal(signal.SIGUSR2, self.detectedImage)
 
-
 		self.as_.start()
 
-		# launch the python3 script
 	def __del__(self):
 		self.yolo.kill()
-
-		
 
 	def detectCB(self, goal):
 		rospy.loginfo("Goal received")

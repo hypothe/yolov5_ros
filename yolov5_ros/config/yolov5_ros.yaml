@@ -9,7 +9,7 @@ yolo:
     exec: yolov5_detect.py
 
   local:
-    yolo_path: /home/user/ws/src/sciroc2021_objdet_meta/yolov5_ros/yolov5/scripts
-    weight_path: /home/user/ws/src/sciroc2021_objdet_meta/yolov5_ros/yolov5/weights
-    image_path: /home/user/ws/src/sciroc2021_objdet_meta/yolov5_ros/yolov5/images
+    yolo_path: yolov5/scripts
+    weight_path: yolov5/weights
+    image_path: yolov5/images
     image: det.jpg
