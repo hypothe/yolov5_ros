@@ -102,16 +102,19 @@ class YoloAction():
 		
 		# _ = self.detection + self.yolo.stdout.readline()
 		bbs = BoundingBoxes()
+		prec_class = ''
 		while ready_stdout:
 			line = self.yolo.stdout.readline().split()
 			try:
 				int(line[0])
-			except ValueError:
+			except ValueError, IndexError:
 				pass
 			else:
 				bb = BoundingBox()
-				bb.id, bb.xmin, bb.ymin, bb.xmax, bb.ymax, bb.probability = [float(x) for x in line[:-2]]
-				bb.Class = line[-1]
+				bb.id, bb.xmin, bb.ymin, bb.xmax, bb.ymax, bb.probability = [float(x) for x in line[:6]]
+				if len(line) >= 8:
+					prec_class = line[7]
+				bb.Class = prec_class
 				
 				bbs.bounding_boxes.append(bb)
 			ready_stdout, _, _ = select.select(readlist, [], [], 0)
