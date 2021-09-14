@@ -107,7 +107,7 @@ class YoloAction():
 			line = self.yolo.stdout.readline().split()
 			try:
 				int(line[0])
-			except ValueError, IndexError:
+			except (ValueError, IndexError):
 				pass
 			else:
 				bb = BoundingBox()
