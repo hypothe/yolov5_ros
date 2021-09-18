@@ -5,7 +5,7 @@ yolo:
 
   model:
     name: ultralytics/yolov5
-    weight: best.pt
+    weight: best_yolov5s_600_f10_ev.pt
     exec: yolov5_detect.py
 
   local:

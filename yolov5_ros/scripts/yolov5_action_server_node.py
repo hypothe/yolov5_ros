@@ -141,6 +141,6 @@ if __name__ == '__main__':
 	model_name = rospy.get_param('yolo/model/name', 'ultralytics/yolov5')
 	# weight_name = "yolov5s_sciroc.pt"
 	#weight_name = "best.pt"
-	weight_name = rospy.get_param('yolo/model/weight', 'best_yolov5s_600_f10_ev.pt')
+	weight_name = rospy.get_param('yolo/model/weight', 'best.pt')
 	as_ = YoloAction(action_name, model_name, weight_name)
 	rospy.spin()
