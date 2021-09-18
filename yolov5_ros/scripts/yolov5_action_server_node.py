@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 # apt-get install python-pip
 # pip install subprocess32
@@ -104,14 +104,17 @@ class YoloAction():
 		bbs = BoundingBoxes()
 		prec_class = ''
 		while ready_stdout:
-			line = self.yolo.stdout.readline().split()
+			lll = str(self.yolo.stdout.readline().decode("utf-8")).strip()
+			line = lll.split()
+			ii = -1
 			try:
-				int(line[0])
+				tmp = int(line[0])
 			except (ValueError, IndexError):
 				pass
 			else:
 				bb = BoundingBox()
-				bb.id, bb.xmin, bb.ymin, bb.xmax, bb.ymax, bb.probability = [float(x) for x in line[:6]]
+				bb.id, bb.xmin, bb.ymin, bb.xmax, bb.ymax = [int(round(float(x))) for x in line[:5]]
+				bb.probability = float(line[5])
 				if len(line) >= 8:
 					prec_class = line[7]
 				bb.Class = prec_class
@@ -133,12 +136,11 @@ class YoloAction():
 
 if __name__ == '__main__':
 	rospy.init_node('yolov5_as')
-	# TODO: take these values from param server
 	action_name = rospy.get_param("yolo/actions/yolo/topic")
 	#model_name = "ultralytics/yolov5"
 	model_name = rospy.get_param('yolo/model/name', 'ultralytics/yolov5')
 	# weight_name = "yolov5s_sciroc.pt"
 	#weight_name = "best.pt"
-	weight_name = rospy.get_param('yolo/model/weight', 'best.pt')
+	weight_name = rospy.get_param('yolo/model/weight', 'best_yolov5s_600_f10_ev.pt')
 	as_ = YoloAction(action_name, model_name, weight_name)
 	rospy.spin()
