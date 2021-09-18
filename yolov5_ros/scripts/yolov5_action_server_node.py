@@ -1,8 +1,5 @@
 #! /usr/bin/env python3
 
-# apt-get install python-pip
-# pip install subprocess32
-
 import rospy
 import rospkg
 
@@ -15,19 +12,30 @@ from darknet_ros_msgs.msg import (
 	BoundingBoxes
 )
 
-import signal
 import os
 import sys
-import select
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
+# yolov5 detection
+import numpy
+import torch
 
-if os.name == 'posix' and sys.version_info[0] < 3:
-	import subprocess32 as subprocess
-else:
-	import subprocess
 
-os.environ["PYTHONUNBUFFERED"] = "1"
+class YoloDetector(object):
+	def __init__(self, yolo_name, weight_path):
+		self.yolo_name = yolo_name
+		self.weight = weight_path
+
+		try:
+			self.model = torch.hub.load(self.yolo_name, 'custom', path = self.weight)  # local repo
+			rospy.loginfo("Model loaded")
+		except Exception as e:
+			rospy.logerr("Error loading model from torch hub: ", e)
+			rospy.shutdown()
+
+	def detect(self, image):
+		results = self.model(image, size=640)
+		return results.pandas().xyxy[0].values
 
 class YoloAction():
 
@@ -42,95 +50,45 @@ class YoloAction():
 		yolov5_path = os.path.dirname(rospack.get_path('yolov5_ros'))
 		print(yolov5_path)
 
-		# cwd = os.path.dirname(os.path.realpath(__file__))
-
-		pt1, pt2 = rospy.get_param("yolo/local/yolo_path"), rospy.get_param("yolo/model/exec")
-		self.yolo_path = os.path.normpath(os.path.join(yolov5_path, pt1, pt2))
-		print(self.yolo_path)
-
-		im1, im2 = rospy.get_param("yolo/local/image_path"), rospy.get_param("yolo/local/image")
-		self.image_path = os.path.normpath(os.path.join(yolov5_path, im1, im2))
-		print(self.image_path)
-
 		wg1, wg2 = rospy.get_param("yolo/local/weight_path"), rospy.get_param("yolo/model/weight")
 		self.weight_path = os.path.normpath(os.path.join(yolov5_path, wg1, wg2))
 		print(self.weight_path)
 		
 		self.as_ = actionlib.SimpleActionServer(self.action_name, CheckForObjectsAction, execute_cb=self.detectCB, auto_start = False)
 
-		self.yolo = subprocess.Popen(["python3", self.yolo_path, self.model_name, self.image_path, self.weight_path], bufsize=0, stdout=subprocess.PIPE)
-		out = self.yolo.stdout.readline()
-		rospy.loginfo("Subprocess started %s" % out)
-		# the subprocess informs this one once the results are ready
-		signal.signal(signal.SIGUSR2, self.detectedImage)
+		self.yolo = YoloDetector(self.model_name, self.weight_path)
 
 		self.as_.start()
-
-	def __del__(self):
-		self.yolo.kill()
 
 	def detectCB(self, goal):
 		rospy.loginfo("Goal received")
 		
 		try:
 			self.image = self.bridge.imgmsg_to_cv2(goal.image, 'bgr8')
-			width, height, _ = self.image.shape
 		except CvBridgeError as e:
 			rospy.logerr("%s: image conversion to cv2 failed" % e)
+			self.as_.set_aborted(text="Image conversion failed")
+			return
 
 		# Save the image and inform the subprocess that it's ready
-		cv2.imwrite(self.image_path, self.image)
-
-		self.got_detection = False
-		self.detection = ''
-		print("Sending and waiting for detection")
-		self.yolo.send_signal(signal.SIGUSR1)
-
-		r = rospy.Rate(100)
-		while not self.got_detection:
-			if self.as_.is_preempt_requested():
-				rospy.loginfo('%s: Preempted' % self.action_name)
-				self.as_.set_preempted()
-				success = False
-				return
-			
-			r.sleep()
-
-		# Not preempted, signal received
-		ready_stdout = [self.yolo.stdout.fileno()] # so it's not empty initially, not used elsewhere
-		readlist = [self.yolo.stdout.fileno()]
 		
-		# _ = self.detection + self.yolo.stdout.readline()
-		bbs = BoundingBoxes()
-		prec_class = ''
-		while ready_stdout:
-			lll = str(self.yolo.stdout.readline().decode("utf-8")).strip()
-			line = lll.split()
-			ii = -1
-			try:
-				tmp = int(line[0])
-			except (ValueError, IndexError):
-				pass
-			else:
-				bb = BoundingBox()
-				bb.id, bb.xmin, bb.ymin, bb.xmax, bb.ymax = [int(round(float(x))) for x in line[:5]]
-				bb.probability = float(line[5])
-				if len(line) >= 8:
-					prec_class = line[7]
-				bb.Class = prec_class
-				
-				bbs.bounding_boxes.append(bb)
-			ready_stdout, _, _ = select.select(readlist, [], [], 0)
+		rospy.logdebug("Starting detection")
 
+		results = self.yolo.detect(self.image)
+		# parse detected bounding boxes
+		bbs = BoundingBoxes()
+		for ii, line in enumerate(results):
+			bb = BoundingBox()
+			bb.id = ii
+			bb.xmin, bb.ymin, bb.xmax, bb.ymax = [int(round(x)) for x in line[:4]]
+			bb.probability = line[4]
+			bb.Class = line[-1]
+			bbs.bounding_boxes.append(bb)
+		
 		result = CheckForObjectsResult()
 		result.id = goal.id
 		result.bounding_boxes = bbs
 		self.as_.set_succeeded(result, text="Detection complete")
-
-
-	def detectedImage(self, signum, frame):
-		print("Yolov5 returned")
-		self.got_detection = True
 
 
 
